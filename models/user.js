@@ -125,19 +125,29 @@ class User {
 
   static async get(username) {
     const userRes = await db.query(
-          `SELECT username,
-                  first_name AS "firstName",
-                  last_name AS "lastName",
-                  email,
-                  is_admin AS "isAdmin"
-           FROM users
-           WHERE username = $1`,
-        [username],
+      `SELECT username,
+              first_name AS "firstName",
+              last_name AS "lastName",
+              email,
+              is_admin AS "isAdmin"
+      FROM users
+      WHERE username = $1`,
+      [username]
     );
 
     const user = userRes.rows[0];
 
     if (!user) throw new NotFoundError(`No user: ${username}`);
+
+    const applicationsRes = await db.query(
+      `SELECT job_id
+      FROM applications
+      WHERE username = $1
+      ORDER BY job_id`,
+      [username]
+    );
+
+    user.jobs = applicationsRes.rows.map(row => row.job_id);
 
     return user;
   }
@@ -190,7 +200,33 @@ class User {
     return user;
   }
 
-  /** Delete given user from database; returns undefined. */
+  /** Apply for job: update db, returns undefined.
+ *
+ * Throws NotFoundError if no such job.
+ */
+
+static async applyToJob(username, jobId) {
+  const preCheck = await db.query(
+    `SELECT id
+     FROM jobs
+     WHERE id = $1`,
+    [jobId]
+  );
+
+  const job = preCheck.rows[0];
+
+  if (!job) {
+    throw new NotFoundError(`No job: ${jobId}`);
+  }
+
+  await db.query(
+    `INSERT INTO applications (username, job_id)
+     VALUES ($1, $2)`,
+    [username, jobId]
+  );
+}
+
+/** Delete given user from database; returns undefined. */
 
   static async remove(username) {
     let result = await db.query(

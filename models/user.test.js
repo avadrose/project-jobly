@@ -5,13 +5,16 @@ const {
   BadRequestError,
   UnauthorizedError,
 } = require("../expressError");
+
 const db = require("../db.js");
 const User = require("./user.js");
+
 const {
   commonBeforeAll,
   commonBeforeEach,
   commonAfterEach,
   commonAfterAll,
+  testJobIds,
 } = require("./_testCommon");
 
 beforeAll(commonBeforeAll);
@@ -19,11 +22,13 @@ beforeEach(commonBeforeEach);
 afterEach(commonAfterEach);
 afterAll(commonAfterAll);
 
+
 /************************************** authenticate */
 
 describe("authenticate", function () {
   test("works", async function () {
     const user = await User.authenticate("u1", "password1");
+
     expect(user).toEqual({
       username: "u1",
       firstName: "U1F",
@@ -52,6 +57,7 @@ describe("authenticate", function () {
   });
 });
 
+
 /************************************** register */
 
 describe("register", function () {
@@ -68,8 +74,13 @@ describe("register", function () {
       ...newUser,
       password: "password",
     });
+
     expect(user).toEqual(newUser);
-    const found = await db.query("SELECT * FROM users WHERE username = 'new'");
+
+    const found = await db.query(
+      "SELECT * FROM users WHERE username = 'new'"
+    );
+
     expect(found.rows.length).toEqual(1);
     expect(found.rows[0].is_admin).toEqual(false);
     expect(found.rows[0].password.startsWith("$2b$")).toEqual(true);
@@ -81,8 +92,16 @@ describe("register", function () {
       password: "password",
       isAdmin: true,
     });
-    expect(user).toEqual({ ...newUser, isAdmin: true });
-    const found = await db.query("SELECT * FROM users WHERE username = 'new'");
+
+    expect(user).toEqual({
+      ...newUser,
+      isAdmin: true,
+    });
+
+    const found = await db.query(
+      "SELECT * FROM users WHERE username = 'new'"
+    );
+
     expect(found.rows.length).toEqual(1);
     expect(found.rows[0].is_admin).toEqual(true);
     expect(found.rows[0].password.startsWith("$2b$")).toEqual(true);
@@ -94,10 +113,12 @@ describe("register", function () {
         ...newUser,
         password: "password",
       });
+
       await User.register({
         ...newUser,
         password: "password",
       });
+
       fail();
     } catch (err) {
       expect(err instanceof BadRequestError).toBeTruthy();
@@ -105,11 +126,13 @@ describe("register", function () {
   });
 });
 
+
 /************************************** findAll */
 
 describe("findAll", function () {
   test("works", async function () {
     const users = await User.findAll();
+
     expect(users).toEqual([
       {
         username: "u1",
@@ -129,17 +152,39 @@ describe("findAll", function () {
   });
 });
 
+
 /************************************** get */
 
 describe("get", function () {
   test("works", async function () {
     let user = await User.get("u1");
+
     expect(user).toEqual({
       username: "u1",
       firstName: "U1F",
       lastName: "U1L",
       email: "u1@email.com",
       isAdmin: false,
+      jobs: [],
+    });
+  });
+
+  test("works with applications", async function () {
+    await User.applyToJob("u1", testJobIds[0]);
+    await User.applyToJob("u1", testJobIds[1]);
+
+    let user = await User.get("u1");
+
+    expect(user).toEqual({
+      username: "u1",
+      firstName: "U1F",
+      lastName: "U1L",
+      email: "u1@email.com",
+      isAdmin: false,
+      jobs: [
+        testJobIds[0],
+        testJobIds[1],
+      ],
     });
   });
 
@@ -153,6 +198,7 @@ describe("get", function () {
   });
 });
 
+
 /************************************** update */
 
 describe("update", function () {
@@ -164,25 +210,31 @@ describe("update", function () {
   };
 
   test("works", async function () {
-    let job = await User.update("u1", updateData);
-    expect(job).toEqual({
+    let user = await User.update("u1", updateData);
+
+    expect(user).toEqual({
       username: "u1",
       ...updateData,
     });
   });
 
   test("works: set password", async function () {
-    let job = await User.update("u1", {
+    let user = await User.update("u1", {
       password: "new",
     });
-    expect(job).toEqual({
+
+    expect(user).toEqual({
       username: "u1",
       firstName: "U1F",
       lastName: "U1L",
       email: "u1@email.com",
       isAdmin: false,
     });
-    const found = await db.query("SELECT * FROM users WHERE username = 'u1'");
+
+    const found = await db.query(
+      "SELECT * FROM users WHERE username = 'u1'"
+    );
+
     expect(found.rows.length).toEqual(1);
     expect(found.rows[0].password.startsWith("$2b$")).toEqual(true);
   });
@@ -200,6 +252,7 @@ describe("update", function () {
 
   test("bad request if no data", async function () {
     expect.assertions(1);
+
     try {
       await User.update("c1", {});
       fail();
@@ -209,13 +262,48 @@ describe("update", function () {
   });
 });
 
+
+/************************************** applyToJob */
+
+describe("applyToJob", function () {
+  test("works", async function () {
+    await User.applyToJob("u1", testJobIds[0]);
+
+    const result = await db.query(
+      `SELECT username, job_id
+       FROM applications
+       WHERE username = 'u1'`
+    );
+
+    expect(result.rows).toEqual([
+      {
+        username: "u1",
+        job_id: testJobIds[0],
+      },
+    ]);
+  });
+
+  test("not found if no such job", async function () {
+    try {
+      await User.applyToJob("u1", 999999);
+      fail();
+    } catch (err) {
+      expect(err instanceof NotFoundError).toBeTruthy();
+    }
+  });
+});
+
+
 /************************************** remove */
 
 describe("remove", function () {
   test("works", async function () {
     await User.remove("u1");
+
     const res = await db.query(
-        "SELECT * FROM users WHERE username='u1'");
+      "SELECT * FROM users WHERE username='u1'"
+    );
+
     expect(res.rows.length).toEqual(0);
   });
 

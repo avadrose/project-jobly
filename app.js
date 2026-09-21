@@ -14,6 +14,8 @@ const usersRoutes = require("./routes/users");
 
 const morgan = require("morgan");
 
+const jobRoutes = require("./routes/jobs");
+
 const app = express();
 
 app.use(cors());
@@ -24,7 +26,7 @@ app.use(authenticateJWT);
 app.use("/auth", authRoutes);
 app.use("/companies", companiesRoutes);
 app.use("/users", usersRoutes);
-
+app.use("/jobs", jobRoutes);
 
 /** Handle 404 errors -- this matches everything */
 app.use(function (req, res, next) {

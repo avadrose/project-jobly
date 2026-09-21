@@ -6,7 +6,7 @@ const jsonschema = require("jsonschema");
 const express = require("express");
 
 const { BadRequestError } = require("../expressError");
-const { ensureLoggedIn } = require("../middleware/auth");
+const { ensureAdmin, ensureCorrectUserOrAdmin } = require("../middleware/auth");
 const Company = require("../models/company");
 
 const companyNewSchema = require("../schemas/companyNew.json");
@@ -24,7 +24,7 @@ const router = new express.Router();
  * Authorization required: login
  */
 
-router.post("/", ensureLoggedIn, async function (req, res, next) {
+router.post("/", ensureAdmin, async function (req, res, next) {
   try {
     const validator = jsonschema.validate(req.body, companyNewSchema);
     if (!validator.valid) {
@@ -50,9 +50,39 @@ router.post("/", ensureLoggedIn, async function (req, res, next) {
  * Authorization required: none
  */
 
+  /** GET /  =>
+ *   { companies: [ { handle, name, description, numEmployees, logoUrl }, ...] }
+ *
+ * Can filter on:
+ * - name
+ * - minEmployees
+ * - maxEmployees
+ *
+ * Authorization required: none
+ */
+
 router.get("/", async function (req, res, next) {
   try {
-    const companies = await Company.findAll();
+    const allowedFilters = ["name", "minEmployees", "maxEmployees"];
+
+    for (let key of Object.keys(req.query)) {
+      if (!allowedFilters.includes(key)) {
+        throw new BadRequestError(`Invalid filter: ${key}`);
+      }
+    }
+
+    const filters = { ...req.query };
+
+    if (filters.minEmployees !== undefined) {
+      filters.minEmployees = Number(filters.minEmployees);
+    }
+
+    if (filters.maxEmployees !== undefined) {
+      filters.maxEmployees = Number(filters.maxEmployees);
+    }
+
+    const companies = await Company.findAll(filters);
+
     return res.json({ companies });
   } catch (err) {
     return next(err);
@@ -87,7 +117,7 @@ router.get("/:handle", async function (req, res, next) {
  * Authorization required: login
  */
 
-router.patch("/:handle", ensureLoggedIn, async function (req, res, next) {
+router.patch("/:handle", ensureAdmin, async function (req, res, next) {
   try {
     const validator = jsonschema.validate(req.body, companyUpdateSchema);
     if (!validator.valid) {
@@ -107,7 +137,7 @@ router.patch("/:handle", ensureLoggedIn, async function (req, res, next) {
  * Authorization: login
  */
 
-router.delete("/:handle", ensureLoggedIn, async function (req, res, next) {
+router.delete("/:handle", ensureAdmin, async function (req, res, next) {
   try {
     await Company.remove(req.params.handle);
     return res.json({ deleted: req.params.handle });

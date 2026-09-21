@@ -1,3 +1,20 @@
+/** Build a SQL SET clause for a partial update.
+ *
+ * dataToUpdate:
+ *   object containing fields/values to update
+ *
+ * jsToSql:
+ *   mapping of JavaScript field names to database column names
+ *
+ * Returns:
+ *   {
+ *     setCols: '"first_name"=$1, "age"=$2',
+ *     values: ['Aliya', 32]
+ *   }
+ *
+ * Throws BadRequestError if no data is provided.
+ */
+
 const { BadRequestError } = require("../expressError");
 
 // THIS NEEDS SOME GREAT DOCUMENTATION.
